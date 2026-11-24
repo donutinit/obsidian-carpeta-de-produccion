@@ -1,5 +1,5 @@
 import { MarkdownView, Notice, TFile, type App } from 'obsidian';
-import { analizar, analizarEnLinea, moverEscena, textoPlano, type Cambio, type Guion } from '../motor';
+import { analizar, moverEscena, resumenEscena, type Cambio, type Guion } from '../motor';
 
 /** Tipo propio del arrastre de escenas: soltar en el editor no escribe nada en el guion. */
 export const MIME_ESCENA = 'application/x-carpeta-escena';
@@ -20,13 +20,7 @@ export function pintarColor(el: HTMLElement, color?: string): void {
 }
 
 /** La sinopsis «=» de la escena o, si no hay, el inicio de su primera acción. */
-export function resumen(g: Guion, k: number, largo = LARGO_RESUMEN): string {
-  const de = g.doc.elementos.filter((e) => e.escena === k);
-  const e = de.find((x) => x.tipo === 'sinopsis') ?? de.find((x) => x.tipo === 'accion');
-  if (!e) return '';
-  const t = textoPlano(analizarEnLinea(e.texto.replace(/\n/g, ' '))).trim();
-  return t.length > largo ? t.slice(0, largo - 1).trimEnd() + '…' : t;
-}
+export const resumen = (g: Guion, k: number, largo = LARGO_RESUMEN): string => resumenEscena(g, k, largo);
 
 /**
  * Mueve una escena a la posición de otra en una sola transacción (Ctrl+Z la deshace entera). Las escenas se

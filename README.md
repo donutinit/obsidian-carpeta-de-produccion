@@ -69,7 +69,13 @@ Las tablas del proyecto (ruta crítica, guion técnico, shooting list, hojas de 
 - **Bloques para cualquier nota del proyecto:**
   - `carpeta-guion` y `carpeta-octavos`;
   - `carpeta-breakdown`, `carpeta-reparto`, `carpeta-locaciones` y `carpeta-elementos`;
-  - `carpeta-requisitos`.
+  - `carpeta-requisitos`;
+  - `carpeta-plan` (en la shooting list) y `carpeta-llamado` (en las hojas de llamado), con `día 2` adentro para un solo día. Ver «Plan de rodaje y hojas de llamado».
+  - `carpeta-beats` (con `escena 3` adentro para una sola): la hoja de beats de dirección de actores, con cada acción y cada parlamento numerado y quién habla; Tema se llena a mano;
+  - `carpeta-vestuario`: vestuario y maquillaje por personaje con códigos de cambio (A1, A2, J1). La marca dice de quién es: `{vest:traje|Antonio: Traje gris}`;
+  - `carpeta-cues`: el mapa de cues musicales (M1, M2…) con las marcas de música y sonido;
+  - `carpeta-creditos`: los créditos, con el equipo por puesto (propiedad `equipo` de la ficha: «Nombre · Matrícula · Puesto») y el reparto con su actor (propiedad `actor` de cada ficha de personaje);
+  - `carpeta-timing`: el timing de la plantilla (escena, set, acciones, páginas, octavos, planos, tiempo y acumulado). Los planos y su duración salen del guion técnico del proyecto; sin él, el tiempo se estima con el texto. Tiene un botón para copiarlo como tabla Markdown.
 - **Notas por escena para Bases** y **breakdown en CSV**.
 
 **Llenar las tablas del proyecto**
@@ -99,14 +105,69 @@ Al pulsar una celda de una tabla en un documento del proyecto se abre un panel. 
   - *completo*, para volver a importarlo sin perder nada.
 - **Final Draft (FDX):** exportar e importar.
 
+**Personajes y dirección de actores**
+
+- **«Crear fichas de personaje»:** una nota por personaje del reparto en `Personajes/`. Cada ficha trae:
+  - la vida interior y exterior del diseño de personaje;
+  - la biografía, los hechos, preguntas e imágenes por sentido, y las 11 preguntas del análisis de escena;
+  - una tabla de casting (naturalidad, credibilidad, dicción, maleabilidad y presencia);
+  - el bloque `carpeta-personaje`, con sus escenas y cuántos parlamentos tiene en cada una.
+  Las fichas existentes no se tocan. Los nombres de `Personajes/` cuentan como personajes conocidos del reparto.
+- **Números de parlamento:** contados por escena, junto al nombre de quien habla. Se prenden en los ajustes o con «Alternar números de parlamento».
+- **Sides por actor (PDF):** sirven también como diálogos de audición.
+
+**Series**
+
+- **«Nueva serie»:** crea `Proyectos/<título>/` con la propuesta y el primer episodio. La propuesta trae datos, argumento, arco de la temporada, personajes, episodios por apertura en frío, actos y remate, esencia e intro.
+- **«Nuevo episodio de la serie»:** agrega `Episodio N/` con su guion. Cada episodio es un guion con su propia carpeta.
+
 **Revisar**
 
 - **Comentarios:** «Comentar selección» escribe `%%>Autor: texto%%`. El panel de comentarios sirve para responder, resolver y borrar, y los comentarios nunca se imprimen.
+- **Revisar el guion:** un panel señala, escena por escena, lo que la clase de guionismo corrige:
+  - acción en pasado;
+  - lo que la cámara no ve («se da cuenta», «piensa», «podemos ver»);
+  - prosa («uno de los … más …», «aparentemente»);
+  - diálogo narrado («le dice que…»);
+  - acciones a media réplica;
+  - un personaje con dos nombres;
+  - personajes que hablan sin haberlos presentado en mayúsculas;
+  - escenas que empiezan con diálogo.
+  Lo que va entre comillas en la acción, como un mensaje o un letrero, no se revisa. Un clic lleva a la línea.
 - **Búsqueda** por tipo de párrafo.
 - **Concentración:** modo máquina de escribir y modo enfoque.
 - **Escritura:** sprints con temporizador y registro de sesiones con palabras netas.
 - **Verificador de requisitos:** reglas como `max_paginas`, `max_locaciones` o `max_personajes_escena` en la ficha del proyecto.
 - **Tarjetas de escenas** y **sides por actor** en PDF.
+
+## Plan de rodaje y hojas de llamado
+
+1. En la shooting list (`carpeta: shooting-list`), escribe en la tabla «Orden de rodaje» qué escenas se filman cada día y en qué orden. Usa las columnas «Día» y «Esc.»: una fila por escena, o varias escenas separadas por comas («3, 1»).
+2. En las tablas «Dato | Valor» bajo cada «## Día N» pon:
+   - la fecha;
+   - la primera toma (`9:00`, `9 am`, `9h`, `21:30 hrs`; 8:00 si falta);
+   - si quieres, el «Llamado de crew». Si no, se calcula dos horas antes de la primera toma.
+   Una escena repetida en el mismo día se programa una sola vez, con aviso. `minutos_comida: 0` quita la comida.
+3. El bloque `carpeta-plan` arma los planos de cada día en orden de rodaje. Los toma del guion técnico del proyecto y les pone:
+   - la hora de cada plano;
+   - la comida después de seis horas;
+   - el set, el día o la noche y el talento.
+   Una escena sin planos en el guion técnico va completa, con su tiempo calculado por octavos.
+4. En las hojas de llamado, el bloque `carpeta-llamado` arma por día:
+   - las escenas, con set, personajes, planos, octavos y horario;
+   - el reparto con su llamado, una hora antes de su primer plano.
+   El llamado de crew es dos horas antes de la primera toma.
+
+Cada plano dura lo que diga la columna «Tiempo de grabación» del guion técnico: `45`, `45 min`, `1:15` o `1h30`. La plantilla no la trae, así que agrégala si quieres horarios reales.
+
+Si un plano no la tiene, se usan las propiedades de la ficha del proyecto, y el plan lo marca con «≈»:
+
+- `minutos_por_plano`: 30 por defecto;
+- `minutos_por_octavo`: 10, para las escenas sin planos;
+- `minutos_comida`: 60;
+- `comida_tras_horas`: 6.
+
+Todas las tablas generadas tienen un botón «Copiar como tabla» para pegarlas fijas en la nota.
 
 ## Requisitos y privacidad
 
@@ -125,6 +186,7 @@ Las propiedades de la ficha del proyecto (`carpeta: proyecto`) viajan con la car
 - `ultima_pagina_completa` y `cronometraje` (`pagina`, `caracteres` o `tipo`);
 - `dic_*`, `categorias_extra` y `orden_reparto`;
 - `movimientos`, `angulos` y `lentes`;
+- `minutos_por_plano`, `minutos_por_octavo`, `minutos_comida` y `comida_tras_horas`;
 - las reglas del verificador.
 
 ## Desarrollo

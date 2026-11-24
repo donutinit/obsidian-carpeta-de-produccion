@@ -71,21 +71,23 @@ export class ModalCategoria extends SuggestModal<Categoria> {
   }
 }
 
-class ModalTitulo extends Modal {
+export class ModalTitulo extends Modal {
   constructor(
     app: App,
     private alAceptar: (titulo: string) => void,
+    private titulo = 'Nuevo proyecto',
+    private etiqueta = 'Título del proyecto',
   ) {
     super(app);
   }
   onOpen() {
-    this.titleEl.setText('Nuevo proyecto');
+    this.titleEl.setText(this.titulo);
     let valor = '';
     const aceptar = () => {
       this.close();
       this.alAceptar(valor);
     };
-    new Setting(this.contentEl).setName('Título del proyecto').addText((t) => {
+    new Setting(this.contentEl).setName(this.etiqueta).addText((t) => {
       t.inputEl.addClass('cp-ancho-completo');
       t.onChange((x) => (valor = x));
       t.inputEl.addEventListener('keydown', (e) => {

@@ -1,6 +1,6 @@
 import { StateEffect, StateField, type EditorState, type Range } from '@codemirror/state';
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from '@codemirror/view';
-import { construir, iniciosDePagina } from '../../motor';
+import { construir, iniciosDePagina, numerosDeParlamento } from '../../motor';
 import { preferencias } from '../ajustes';
 import { contextoDe } from './contexto';
 import { esDocGuion } from './doc';
@@ -8,6 +8,7 @@ import { esDocGuion } from './doc';
 interface Marcas {
   cortes: { pagina: number; linea: number }[];
   numeros: { linea: number; numero: string }[];
+  parlamentos: { linea: number; numero: number }[];
 }
 
 const fijarMarcas = StateEffect.define<Marcas>();
@@ -42,6 +43,10 @@ function decoraciones(state: EditorState, m: Marcas): DecorationSet {
   for (const n of m.numeros) {
     if (n.linea + 1 > doc.lines) continue;
     out.push(Decoration.line({ class: 'cp-ed-num', attributes: { 'data-cp-num': n.numero } }).range(doc.line(n.linea + 1).from));
+  }
+  for (const n of m.parlamentos) {
+    if (n.linea + 1 > doc.lines) continue;
+    out.push(Decoration.line({ class: 'cp-ed-parl', attributes: { 'data-cp-parl': String(n.numero) } }).range(doc.line(n.linea + 1).from));
   }
   return Decoration.set(out, true);
 }
@@ -79,12 +84,13 @@ const calculador = ViewPlugin.fromClass(
       this.reloj = null;
       const st = this.view.state;
       const p = preferencias.actual;
-      let marcas: Marcas = { cortes: [], numeros: [] };
-      if (esDocGuion(st.doc) && (p.cortesPagina || p.numerosEscena)) {
+      let marcas: Marcas = { cortes: [], numeros: [], parlamentos: [] };
+      if (esDocGuion(st.doc) && (p.cortesPagina || p.numerosEscena || p.numerosParlamento)) {
         const g = construir(st.doc.toString(), contextoDe(st).cfg);
         marcas = {
           cortes: p.cortesPagina ? iniciosDePagina(g.paginas) : [],
           numeros: p.numerosEscena ? g.doc.escenas.map((e) => ({ linea: e.linea, numero: e.numero })) : [],
+          parlamentos: p.numerosParlamento ? numerosDeParlamento(g.doc) : [],
         };
       }
       this.view.dispatch({ effects: fijarMarcas.of(marcas) });
@@ -96,5 +102,5 @@ const calculador = ViewPlugin.fromClass(
   },
 );
 
-/** Marcas de corte de página y números de escena en el editor. */
+/** Marcas de corte de página, números de escena y números de parlamento en el editor. */
 export const marcasDePagina = [campoMarcas, calculador];

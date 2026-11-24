@@ -15,6 +15,8 @@ export interface ValoresProyectoNuevo {
 /** Ajustes del plugin: preferencias personales y valores para proyectos nuevos. */
 export interface Preferencias {
   numerosEscena: boolean;
+  /** El número de cada parlamento, por escena, junto al nombre de quien habla (dirección de actores). */
+  numerosParlamento: boolean;
   cortesPagina: boolean;
   autocompletado: boolean;
   correcciones: OpcionesCorreccion;
@@ -31,6 +33,7 @@ export interface Preferencias {
 
 export const PREFERENCIAS_POR_DEFECTO: Preferencias = {
   numerosEscena: false,
+  numerosParlamento: false,
   cortesPagina: true,
   autocompletado: true,
   maquinaDeEscribir: false,
@@ -57,6 +60,7 @@ export function mezclarPreferencias(guardadas: unknown): Preferencias {
   const d = PREFERENCIAS_POR_DEFECTO;
   return {
     numerosEscena: typeof g.numerosEscena === 'boolean' ? g.numerosEscena : d.numerosEscena,
+    numerosParlamento: typeof g.numerosParlamento === 'boolean' ? g.numerosParlamento : d.numerosParlamento,
     cortesPagina: typeof g.cortesPagina === 'boolean' ? g.cortesPagina : d.cortesPagina,
     autocompletado: typeof g.autocompletado === 'boolean' ? g.autocompletado : d.autocompletado,
     correcciones: { ...d.correcciones, ...(g.correcciones ?? {}) },
@@ -112,6 +116,7 @@ export class PestanaAjustes extends PluginSettingTab {
     new Setting(el).setName('Editor de guion').setHeading();
     interruptor('Marcas de corte de página', 'Una línea tenue con el número de página donde empieza cada página.', () => p.cortesPagina, (v) => (p.cortesPagina = v));
     interruptor('Números de escena', 'El número de cada escena a los dos lados del encabezado.', () => p.numerosEscena, (v) => (p.numerosEscena = v));
+    interruptor('Números de parlamento', 'El número de cada parlamento, contado por escena, junto al nombre de quien habla. Sirve para los beats y los ensayos.', () => p.numerosParlamento, (v) => (p.numerosParlamento = v));
     interruptor('Autocompletado', 'Sugerencias de encabezado, personaje, extensión y transición.', () => p.autocompletado, (v) => (p.autocompletado = v));
     interruptor('Máquina de escribir', 'La línea del cursor se queda a media ventana mientras escribes.', () => p.maquinaDeEscribir, (v) => (p.maquinaDeEscribir = v));
     interruptor('Modo enfoque', 'Atenúa todo menos el párrafo o el bloque de diálogo donde escribes.', () => p.enfoque, (v) => (p.enfoque = v));

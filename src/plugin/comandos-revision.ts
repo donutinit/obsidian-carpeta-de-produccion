@@ -76,6 +76,7 @@ export function registrarRevision(plugin: Plugin, guardar: () => Promise<void>):
   for (const [id, nombre, clave] of [
     ['alternar-maquina', 'Alternar máquina de escribir', 'maquinaDeEscribir'],
     ['alternar-enfoque', 'Alternar modo enfoque', 'enfoque'],
+    ['alternar-parlamentos', 'Alternar números de parlamento', 'numerosParlamento'],
   ] as const) {
     plugin.addCommand({
       id,

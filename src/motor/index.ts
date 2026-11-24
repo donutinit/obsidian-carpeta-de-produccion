@@ -34,8 +34,13 @@ export * from './sugerencias';
 export * from './fechas';
 export * from './tablas';
 export * from './selectores';
+export * from './timing';
+export * from './revisor';
+export * from './plan';
+export * from './personajes';
 
 export type { BreakdownEscena } from './breakdown';
+export { nombrePropio } from './breakdown';
 export { aplicarMarca, type ResultadoMarca } from './marcas';
 
 export interface Guion {

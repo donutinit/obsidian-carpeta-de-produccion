@@ -194,3 +194,10 @@ export function tablaRepetida(fuente: string, L: number): boolean {
   if (firma === undefined) return false;
   return iniciosDeTabla(fuente).some((k) => k !== L && renglonesDeTabla(lineas, k)?.map(forma).join('\n') === firma);
 }
+
+/** Una tabla Markdown lista para pegar; las barras dentro de una celda se escapan. */
+export function tablaMarkdown(cabeza: string[], filas: string[][]): string {
+  const celda = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, ' ').trim();
+  const renglon = (celdas: string[]) => '|' + celdas.map((c) => (celda(c) ? ` ${celda(c)} ` : ' ')).join('|') + '|';
+  return [renglon(cabeza), '|' + cabeza.map(() => '---').join('|') + '|', ...filas.map(renglon)].join('\n') + '\n';
+}

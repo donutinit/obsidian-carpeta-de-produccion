@@ -72,7 +72,7 @@ body.theme-dark {
 /* ---------- vista previa ---------- */
 .carpeta-preview { padding: 0 !important; background: var(--background-secondary); }
 .cp-bar { position: sticky; top: 0; z-index: 3; padding: 6px 12px 8px; font-size: 0.8em; color: var(--text-muted); background: var(--background-secondary); border-bottom: 1px solid var(--background-modifier-border); }
-.cp-msg { padding: 16px; color: var(--text-muted); }
+.cp-msg { padding: 16px; color: var(--cp-muted); }
 .cp-pages { padding: 4px; }
 .cp-pages-inner { width: 8.5in; margin: 0 auto; }
 .carpeta-block .cp-pages { background: var(--background-secondary); border-radius: 6px; }
@@ -313,3 +313,30 @@ body.theme-dark {
 
 .cp-ancho-completo { width: 100%; }
 .cp-impresion-oculta { position: absolute; left: -20000px; top: 0; width: 8.5in; }
+
+/* ---------- Timing ---------- */
+.cp-timing-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cp-timing tfoot td { font-weight: 600; border-top: 2px solid var(--cp-line); }
+.cp-timing-nota { margin-top: 6px; color: var(--cp-muted); font-size: var(--font-ui-smaller); }
+
+/* ---------- Revisión del guion ---------- */
+.cp-panel-rev { padding: 10px 12px !important; }
+.cp-rev-cuenta { color: var(--cp-muted); font-size: var(--font-ui-smaller); margin-bottom: 8px; }
+.cp-rev-escena { font-weight: 600; margin: 12px 0 4px; font-size: var(--font-ui-small); }
+.cp-panel-rev .cp-rev-obs { display: block; width: 100%; height: auto; padding: 6px 8px; margin-bottom: 4px; text-align: left; white-space: normal; background: transparent; box-shadow: none; border: 1px solid var(--cp-line); border-radius: var(--radius-s); color: var(--cp-fg); }
+.cp-panel-rev .cp-rev-obs:hover { background: var(--cp-neutral); }
+.cp-panel-rev .cp-rev-obs:focus-visible { outline: 2px solid var(--cp-fg); outline-offset: 1px; }
+.cp-rev-regla { font-weight: 600; font-size: var(--font-ui-small); }
+.cp-rev-frag { font-style: italic; margin: 2px 0; font-size: var(--font-ui-small); }
+.cp-rev-msg { color: var(--cp-muted); font-size: var(--font-ui-smaller); }
+.cp-rev-obs:hover .cp-rev-msg { color: var(--cp-fg); }
+
+/* ---------- Números de parlamento ---------- */
+.markdown-source-view .cm-line.cp-ed-parl { position: relative; }
+.markdown-source-view .cm-line.cp-ed-parl::before { content: '#' attr(data-cp-parl); position: absolute; right: calc(100% + 1ch); color: var(--cp-muted); font-weight: normal; font-size: var(--font-ui-smaller); }
+
+/* ---------- Créditos ---------- */
+.cp-creditos-lista { text-align: center; line-height: 1.6; }
+.cp-creditos-puesto { font-weight: 600; margin-top: 4px; }
+.cp-plan-datos { color: var(--cp-fg); margin: 2px 0 6px; font-size: var(--font-ui-small); }
+.cp-rev-escena { color: var(--cp-fg); }

@@ -21,6 +21,12 @@ export function buscarGuion(app: App, rutaNota: string): TFile | null {
   return f instanceof TFile ? f : null;
 }
 
+/** Las notas de la carpeta del guion con `carpeta: <valor>` (por ejemplo, el guion técnico). */
+export function notasDelProyecto(app: App, guion: TFile, valor: string): TFile[] {
+  const dir = carpetaDe(guion.path);
+  return app.vault.getMarkdownFiles().filter((f) => carpetaDe(f.path) === dir && propiedades(app, f).carpeta === valor);
+}
+
 /** La nota con `carpeta: proyecto` en la carpeta del guion. */
 export function buscarProyecto(app: App, guion: TFile): TFile | null {
   const dir = carpetaDe(guion.path);

@@ -18,6 +18,8 @@ import { registrarEscritura, type Sesion } from './escritura';
 import { VistaTarjetas, VISTA_TARJETAS } from './tarjetas';
 import { concentracion } from './editor/concentracion';
 import { registrarPaneles } from './paneles';
+import { registrarRevisionGuion } from './panel-revision';
+import { registrarPersonajes } from './comandos-personajes';
 import { VISTA_GUION, VistaPrevia } from './vista-previa';
 
 export default class CarpetaPlugin extends Plugin {
@@ -39,6 +41,8 @@ export default class CarpetaPlugin extends Plugin {
     registrarRevision(this, () => this.guardarPreferencias());
     registrarEscritura(this, this.sesiones, () => this.guardarDatos());
     registrarPaneles(this);
+    registrarRevisionGuion(this);
+    registrarPersonajes(this);
     this.registerView(VISTA_TARJETAS, (leaf) => new VistaTarjetas(leaf));
     this.addRibbonIcon('clapperboard', 'Vista previa del guion', () => void abrirVistaPrevia(this.app));
     this.addRibbonIcon('list-ordered', 'Navegador de escenas', () => void abrirNavegador(this.app));

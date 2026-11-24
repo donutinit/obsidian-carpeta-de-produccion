@@ -10,7 +10,7 @@ export interface BreakdownEscena {
 
 const capitalizar = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 /** «HOMBRE 1» → «Hombre 1», «DON PEDRO» → «Don Pedro». */
-const nombrePropio = (s: string) =>
+export const nombrePropio = (s: string) =>
   s
     .toLowerCase()
     .split(/(\s+)/)
@@ -23,7 +23,7 @@ const escapar = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** ¿La extensión es de voz en off? Quien solo habla en V.O. no está en la escena. */
 const esVozEnOff = (ext?: string) => !!ext && /(^|[\s(])V\.?\s?O\.?($|[\s)])/i.test(ext);
 /** Nombres de diálogo que no son un personaje concreto: no cuentan como mención en la acción. */
-const GENERICOS = new Set(['TODOS', 'TODAS', 'AMBOS', 'AMBAS', 'VOZ', 'VOCES', 'OTROS', 'OTRAS', 'GRUPO', 'VARIOS', 'VARIAS', 'ALGUIEN']);
+export const GENERICOS = new Set(['TODOS', 'TODAS', 'AMBOS', 'AMBAS', 'VOZ', 'VOCES', 'OTROS', 'OTRAS', 'GRUPO', 'VARIOS', 'VARIAS', 'ALGUIEN']);
 const REPARTO_EN_TEXTO = new Set(['encabezado', 'accion', 'plano', 'personaje', 'acotacion', 'dialogo', 'letra', 'transicion', 'centrado']);
 
 export interface OpcionesBreakdown {
