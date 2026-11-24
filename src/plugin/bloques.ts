@@ -1,22 +1,31 @@
 import { debounce, MarkdownRenderChild, TFile, type Plugin } from 'obsidian';
 import { construirDe } from './guion';
+import { textoDe } from './cambios';
+import { correr } from './correr';
 import { buscarGuion, buscarProyecto, notasDelProyecto, propiedades } from './proyecto';
 import { ordenReparto } from './generar';
 import { renderBreakdown } from './render/breakdown';
+import { accionesBreakdown } from './breakdown-editable';
+import { armarStoryboardDe, dibujarVineta, editarVineta, vinetasDelProyecto } from './storyboard';
+import { renderStoryboard, renderVineta } from './render/storyboard';
 import { renderElementos, renderLocaciones, renderReparto } from './render/listas';
 import { renderRequisitos } from './render/requisitos';
 import { reglasDe } from './comandos-revision';
 import { renderHojaOctavos, renderTablaOctavos } from './render/octavos';
 import { renderGuion, tituloDe } from './render/papel';
 import { renderTiming } from './render/timing';
-import { beatsDeEscena, nombrePropio, personajesDelGuion, creditos, cuesMusicales, escenasDePersonaje, listaReparto, vestuarioPorPersonaje, armarLlamado, armarPlan, armarTiming, datosDeDias, diasDelPlan, OPCIONES_PLAN, planosCompletos, planosDeTecnico, type OpcionesPlan, type PlanoTecnico } from '../motor';
+import { estadoStoryboard, idVineta, leerId, vinetaConDibujo, beatsDeEscena, nombrePropio, personajesDelGuion, creditos, cuesMusicales, escenasDePersonaje, listaReparto, vestuarioPorPersonaje, armarLlamado, armarPlan, armarTiming, datosDeDias, diasDelPlan, OPCIONES_PLAN, planosCompletos, planosDeTecnico, type OpcionesPlan, type PlanoTecnico } from '../motor';
 import { renderLlamado, renderPlan } from './render/plan';
 import { renderBeats, renderCreditos, renderCues, renderPersonaje, renderVestuario } from './render/personajes';
 
-type Tipo = 'guion' | 'octavos' | 'breakdown' | 'reparto' | 'locaciones' | 'elementos' | 'requisitos' | 'timing' | 'plan' | 'llamado' | 'beats' | 'personaje' | 'vestuario' | 'cues' | 'creditos';
+type Tipo = 'guion' | 'octavos' | 'breakdown' | 'vineta' | 'storyboard' | 'reparto' | 'locaciones' | 'elementos' | 'requisitos' | 'timing' | 'plan' | 'llamado' | 'beats' | 'personaje' | 'vestuario' | 'cues' | 'creditos';
 
 class BloqueCarpeta extends MarkdownRenderChild {
   private guion: TFile | null = null;
+  /** La casilla de la hoja donde se acaba de agregar o quitar: al redibujar, el foco vuelve a su «+ Agregar». */
+  private enfoque: { k: number; cat: string; t: number } | null = null;
+  /** Cada dibujo de la viñeta o del storyboard lleva su turno: si empezó otro mientras se leía, este no dibuja. */
+  private turno = 0;
   private pendiente = debounce(() => void this.dibujar(), 400, true);
 
   constructor(
@@ -36,7 +45,7 @@ class BloqueCarpeta extends MarkdownRenderChild {
       app.vault.on('modify', (f) => {
         if (!this.guion) return;
         // El timing, el plan y el llamado también dependen de otras notas del proyecto.
-        const otras = this.tipo === 'timing' ? ['guion-tecnico'] : this.tipo === 'plan' || this.tipo === 'llamado' ? ['guion-tecnico', 'shooting-list'] : [];
+        const otras = ['timing', 'breakdown', 'elementos', 'requisitos', 'vineta', 'storyboard'].includes(this.tipo) ? ['guion-tecnico'] : this.tipo === 'plan' || this.tipo === 'llamado' ? ['guion-tecnico', 'shooting-list'] : [];
         const depende = f.path === this.guion.path || (otras.length > 0 && (f.path === this.rutaNota || otras.some((c) => notasDelProyecto(app, this.guion!, c).some((n) => n.path === f.path))));
         if (depende) this.pendiente();
       }),
@@ -55,6 +64,55 @@ class BloqueCarpeta extends MarkdownRenderChild {
     );
   }
 
+  /** La viñeta (`carpeta-vineta` con «E1 · P1» adentro) o el resumen del storyboard, desde el guion técnico. */
+  private async renderStoryboard(el: HTMLElement) {
+    const app = this.plugin.app;
+    const host = app.vault.getAbstractFileByPath(this.rutaNota);
+    if (!(host instanceof TFile)) return;
+    const turno = ++this.turno;
+    const datos = await vinetasDelProyecto(app, host);
+    const vinetas = datos?.vinetas ?? [];
+    const redibujar = () => void this.dibujar();
+    const texto = await textoDe(app, host);
+    if (turno !== this.turno) return;
+    el.empty();
+    el.addClass('carpeta-block');
+    if (this.tipo === 'storyboard') {
+      renderStoryboard(
+        el,
+        estadoStoryboard(
+          texto,
+          vinetas.map((x) => x.vineta),
+        ),
+        () => correr(armarStoryboardDe(app, host, redibujar)),
+      );
+      return;
+    }
+    const id = this.opciones.trim().split('\n')[0]?.trim() ?? '';
+    const clave = leerId(id);
+    const v = clave ? vinetas.find((x) => x.vineta.id === idVineta(clave.escena, clave.numero)) : undefined;
+    renderVineta(
+      el,
+      v?.vineta.id ?? id,
+      v?.vineta ?? null,
+      v && datos
+        ? {
+            editar: (campo, ancla) => editarVineta(app, v, datos.listas, campo, ancla, redibujar),
+            dibujar: vinetaConDibujo(texto, v.vineta.id) ? undefined : () => correr(dibujarVineta(app, host, v.vineta.id)),
+          }
+        : undefined,
+    );
+  }
+
+  /** Tras agregar o quitar, el foco vuelve al «+ Agregar» de esa casilla, si nadie lo movió a otro lado. */
+  private devolverFoco(el: HTMLElement) {
+    const e = this.enfoque;
+    if (!e || Date.now() - e.t > 3000) return;
+    const doc = el.ownerDocument;
+    if (doc.activeElement && doc.activeElement !== doc.body && !el.contains(doc.activeElement)) return;
+    el.querySelectorAll('.cp-sheet')[e.k]?.querySelector<HTMLElement>(`.cp-cell-${e.cat} .cp-bd-agregar`)?.focus({ preventScroll: true });
+  }
+
   /** Dibuja el bloque; si algo falla, lo dice en el bloque en vez de dejarlo en blanco. */
   async dibujar(): Promise<void> {
     try {
@@ -70,13 +128,16 @@ class BloqueCarpeta extends MarkdownRenderChild {
     const app = this.plugin.app;
     this.guion = buscarGuion(app, this.rutaNota);
     const el = this.containerEl;
+    // La viñeta y el storyboard leen todo antes de vaciar el bloque: así no brinca ni se duplica si se redibuja dos veces.
+    if (this.guion && (this.tipo === 'vineta' || this.tipo === 'storyboard')) return this.renderStoryboard(el);
     el.empty();
     el.addClass('carpeta-block');
     if (!this.guion) {
       el.createDiv({ cls: 'cp-msg', text: 'No encontré el guion. En esta carpeta tiene que haber una nota con «carpeta: guion» en sus propiedades.' });
       return;
     }
-    const g = await construirDe(app, this.guion);
+    // El texto del editor si el guion está abierto: lo recién agregado se ve sin esperar a que se guarde.
+    const g = await construirDe(app, this.guion, await textoDe(app, this.guion));
     const o = this.opciones;
     if (this.tipo === 'guion') renderGuion(el, g, { subrayado: /subrayado/.test(o), portada: !/sin portada/.test(o) });
     else if (this.tipo === 'octavos') {
@@ -140,7 +201,17 @@ class BloqueCarpeta extends MarkdownRenderChild {
       for (const n of personajesDelGuion(g)) if (!nombres.some((x) => x.toLowerCase() === n.toLowerCase())) nombres.push(n);
       renderCreditos(el, creditos(equipo, nombres.map((n) => ({ personaje: n, actor: actorDe(n) }))));
     }
-    else renderBreakdown(el, g);
+    else {
+      renderBreakdown(
+        el,
+        g,
+        accionesBreakdown(app, this.guion, g, (k, cat) => {
+          this.enfoque = { k, cat, t: Date.now() };
+          void this.dibujar();
+        }),
+      );
+      this.devolverFoco(el);
+    }
   }
 }
 
@@ -160,7 +231,7 @@ function opcionesPlan(p: Record<string, unknown>): OpcionesPlan {
 }
 
 export function registrarBloques(plugin: Plugin): void {
-  for (const tipo of ['guion', 'octavos', 'breakdown', 'reparto', 'locaciones', 'elementos', 'requisitos', 'timing', 'plan', 'llamado', 'beats', 'personaje', 'vestuario', 'cues', 'creditos'] as const) {
+  for (const tipo of ['guion', 'octavos', 'breakdown', 'vineta', 'storyboard', 'reparto', 'locaciones', 'elementos', 'requisitos', 'timing', 'plan', 'llamado', 'beats', 'personaje', 'vestuario', 'cues', 'creditos'] as const) {
     plugin.registerMarkdownCodeBlockProcessor(`carpeta-${tipo}`, (fuente, el, ctx) => {
       ctx.addChild(new BloqueCarpeta(el, plugin, ctx.sourcePath, tipo, fuente));
     });

@@ -1,10 +1,11 @@
-import { debounce, ItemView, Notice, setIcon, TFile, type WorkspaceLeaf } from 'obsidian';
-import { escenaEnLinea, formatearOctavos, quitarElemento, type Guion } from '../motor';
-import { aplicarCambios } from './cambios';
+import { debounce, ItemView, setIcon, TFile, type WorkspaceLeaf } from 'obsidian';
+import { escenaEnLinea, formatearOctavos, type ElementoBreakdown, type Guion } from '../motor';
+import { abrirAgregar, marcarNoPersonaje, quitarDeEscena } from './breakdown-editable';
+import { soloPresentados } from './render/breakdown';
 import { copiarAOtra, marcarTodas } from './comandos-produccion';
 import { oyentesCursor } from './editor/cursor';
 import { construirDe } from './guion';
-import { buscarGuion } from './proyecto';
+import { buscarGuion, notasDelProyecto } from './proyecto';
 import { claseCategoria } from './render/papel';
 import { correr, type Quizas } from './correr';
 
@@ -48,7 +49,9 @@ export class PanelBreakdown extends ItemView {
     );
     this.registerEvent(
       this.app.vault.on('modify', (f) => {
-        if (f.path === this.ruta) this.pendiente();
+        const guion = this.ruta ? this.app.vault.getAbstractFileByPath(this.ruta) : null;
+        // El equipo especial también sale del guion técnico del proyecto.
+        if (f.path === this.ruta || (guion instanceof TFile && notasDelProyecto(this.app, guion, 'guion-tecnico').some((n) => n.path === f.path))) this.pendiente();
       }),
     );
     this.registerEvent(
@@ -102,39 +105,50 @@ export class PanelBreakdown extends ItemView {
     const copiar = acciones.createEl('button', { text: 'Copiar elementos a otra escena' });
     copiar.onclick = () => copiarAOtra(this.app, f, this.escena);
 
-    const sec = el.createDiv({ cls: 'cp-pbd-cat' });
-    sec.createSpan({ cls: 'cp-mark ' + claseCategoria('rep', g.config.categorias), text: 'Reparto' });
-    const ul = sec.createEl('ul');
-    if (!bd.reparto.length) ul.createEl('li', { cls: 'cp-empty', text: '—' });
-    bd.reparto.forEach((n) => ul.createEl('li', { text: n }));
-
-    let alguno = false;
+    const presentadoSolo = soloPresentados(g);
+    // Todas las categorías, cada una con «+» para agregar sin escribir marcas.
     for (const c of g.config.categorias) {
-      const lista = bd.elementos[c.codigo];
-      if (c.codigo === 'rep' || !lista?.length) continue;
-      alguno = true;
+      const lista: ElementoBreakdown[] = c.codigo === 'rep' ? bd.reparto.map((nombre) => ({ nombre, cantidad: 1 })) : (bd.elementos[c.codigo] ?? []);
       const s = el.createDiv({ cls: 'cp-pbd-cat' });
-      s.createSpan({ cls: 'cp-mark ' + claseCategoria(c.codigo, g.config.categorias), text: c.nombre });
+      const cabeza = s.createDiv({ cls: 'cp-pbd-catcab' });
+      cabeza.createSpan({ cls: 'cp-mark ' + claseCategoria(c.codigo, g.config.categorias), text: c.nombre });
+      const mas = cabeza.createEl('button', { cls: 'clickable-icon', attr: { type: 'button', 'aria-label': `Agregar a ${c.nombre}` } });
+      setIcon(mas, 'plus');
+      const k = this.escena;
+      mas.onclick = () => abrirAgregar(this.app, f, g, k, c.codigo, mas);
+      if (!lista.length) continue;
       const u = s.createEl('ul');
       for (const x of lista) {
         const li = u.createEl('li');
         li.createSpan({ cls: 'cp-pbd-nombre', text: x.cantidad > 1 ? `${x.nombre} (×${x.cantidad})` : x.nombre });
+        // En el reparto solo se quita lo marcado o lo que se presentó con edad; quien habla está por su diálogo.
+        if (c.codigo === 'rep' && !(bd.elementos.rep ?? []).some((y) => y.nombre.toLowerCase() === x.nombre.toLowerCase())) {
+          if (presentadoSolo(x.nombre)) {
+            const b = li.createEl('button', { cls: 'clickable-icon', attr: { type: 'button', 'aria-label': `«${x.nombre}» no es personaje` } });
+            setIcon(b, 'x');
+            b.onclick = () => marcarNoPersonaje(this.app, f, x.nombre);
+          }
+          continue;
+        }
+        if (x.origen === 'tecnico') {
+          const t = li.createSpan({ cls: 'cp-bd-tecnico', attr: { role: 'img', 'aria-label': 'Del guion técnico' } });
+          setIcon(t, 'cog');
+          t.title = 'Del guion técnico: se cambia ahí';
+          continue;
+        }
         const boton = (icono: string, titulo: string, fn: () => Quizas) => {
-          const b = li.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': titulo } });
+          const b = li.createEl('button', { cls: 'clickable-icon', attr: { type: 'button', 'aria-label': titulo } });
           setIcon(b, icono);
           b.onclick = () => correr(fn());
         };
-        boton('highlighter', 'Marcar todas las menciones', () => {
-          const visible = this.textoVisible(c.codigo, x.nombre) ?? x.nombre;
-          void marcarTodas(this.app, f, c.codigo, visible, x.nombre);
-        });
-        boton('x', 'Quitar de esta escena', async () => {
-          const n = await aplicarCambios(this.app, f, (t) => quitarElemento(t, this.escena, c.codigo, x.nombre));
-          new Notice(n ? `«${x.nombre}» ya no está en la escena ${e.numero}.` : 'No encontré sus marcas.');
-        });
+        if (c.codigo !== 'rep')
+          boton('highlighter', 'Marcar todas las menciones', () => {
+            const visible = this.textoVisible(c.codigo, x.nombre) ?? x.nombre;
+            void marcarTodas(this.app, f, c.codigo, visible, x.nombre);
+          });
+        boton('x', `Quitar «${x.nombre}» de esta escena`, () => quitarDeEscena(this.app, f, g, k, c.codigo, x.nombre));
       }
     }
-    if (!alguno) el.createDiv({ cls: 'cp-msg', text: 'Esta escena no tiene elementos marcados. Selecciona texto y pulsa el número de su categoría.' });
   }
 
   /** El texto visible de la primera marca de ese elemento en la escena (para buscar sus menciones). */

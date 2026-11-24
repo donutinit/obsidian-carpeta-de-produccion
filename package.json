@@ -1,6 +1,6 @@
 {
   "name": "carpeta-de-produccion",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Carpeta de producción: guion, octavos y breakdown para Obsidian",
   "scripts": {
     "build": "node esbuild.config.mjs",

@@ -84,7 +84,7 @@ export class VistaPrevia extends ItemView {
       el.createDiv({ cls: 'cp-msg', text: 'Abre una nota de guion (con «carpeta: guion» en sus propiedades) para verla paginada.' });
       return;
     }
-    const g = await construirDe(this.app, archivo, texto);
+    const g = await construirDe(this.app, archivo, texto, { equipo: false });
     const barra = el.createDiv({ cls: 'cp-bar' });
     const paginas = g.paginas.length;
     const escenas = g.doc.escenas.length;

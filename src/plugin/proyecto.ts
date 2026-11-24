@@ -1,5 +1,5 @@
 import { TFile, type App } from 'obsidian';
-import { categoriasDe, DICCIONARIOS_MX, guionMasCercano, limpiarLista, type Config, type Diccionarios } from '../motor';
+import { categoriasDe, DICCIONARIOS_MX, guionMasCercano, limpiarLista, listasDePropiedades, type Config, type Diccionarios, type ListasTecnicas } from '../motor';
 
 const carpetaDe = (ruta: string) => (ruta.includes('/') ? ruta.slice(0, ruta.lastIndexOf('/')) : '');
 
@@ -27,6 +27,12 @@ export function notasDelProyecto(app: App, guion: TFile, valor: string): TFile[]
   return app.vault.getMarkdownFiles().filter((f) => carpetaDe(f.path) === dir && propiedades(app, f).carpeta === valor);
 }
 
+/** Movimientos, ángulos y lentes: los de las propiedades del proyecto (la ficha junto al guion), o los de fábrica. */
+export function listasDelProyecto(app: App, nota: TFile): ListasTecnicas {
+  const proyecto = buscarProyecto(app, buscarGuion(app, nota.path) ?? nota);
+  return listasDePropiedades(proyecto ? propiedades(app, proyecto) : {});
+}
+
 /** La nota con `carpeta: proyecto` en la carpeta del guion. */
 export function buscarProyecto(app: App, guion: TFile): TFile | null {
   const dir = carpetaDe(guion.path);
@@ -49,6 +55,20 @@ export function fichasDelProyecto(app: App, rutaNota: string): { personajes: str
   return { personajes: de('Personajes'), locaciones: de('Locaciones') };
 }
 
+/** La edad de cada personaje según su ficha en `Personajes/` (propiedad `edad`), por nombre. */
+export function edadesDeFichas(app: App, guion: TFile): Record<string, string> {
+  const dir = carpetaDe(guion.path);
+  const out: Record<string, string> = {};
+  for (const f of app.vault.getMarkdownFiles()) {
+    const partes = f.path.split('/');
+    if (partes.length < 2 || partes[partes.length - 2].toLowerCase() !== 'personajes' || carpetaDe(carpetaDe(f.path)) !== dir) continue;
+    const p = propiedades(app, f);
+    const edad = typeof p.edad === 'number' ? String(p.edad) : typeof p.edad === 'string' ? p.edad.trim() : '';
+    if (edad) out[typeof p.personaje === 'string' && p.personaje.trim() ? p.personaje.trim() : f.basename] = edad;
+  }
+  return out;
+}
+
 export function leerConfigProyecto(app: App, rutaNota: string): Partial<Config> {
   const guion = buscarGuion(app, rutaNota);
   const proyecto = guion && buscarProyecto(app, guion);
@@ -57,6 +77,8 @@ export function leerConfigProyecto(app: App, rutaNota: string): Partial<Config> 
   const p = propiedades(app, proyecto);
   const cfg: Partial<Config> = {};
   if (fichas.length) cfg.personajesConocidos = fichas;
+  const noSon = Array.isArray(p.no_son_personajes) ? p.no_son_personajes.map(String) : typeof p.no_son_personajes === 'string' ? p.no_son_personajes.split(/[,\n]/) : [];
+  if (noSon.length) cfg.noSonPersonajes = noSon.map((x) => x.trim()).filter(Boolean);
   if (p.categorias_extra !== undefined && p.categorias_extra !== null) cfg.categorias = categoriasDe(p.categorias_extra);
   const r = numero(p.renglones_por_pagina);
   if (Number.isFinite(r)) cfg.renglonesPorPagina = Math.min(56, Math.max(54, Math.round(r)));

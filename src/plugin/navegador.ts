@@ -88,7 +88,7 @@ export class Navegador extends ItemView {
       el.createDiv({ cls: 'cp-msg', text: 'Abre una nota de guion para ver sus escenas.' });
       return;
     }
-    const g = await construirDe(this.app, archivo, texto);
+    const g = await construirDe(this.app, archivo, texto, { equipo: false });
     this.g = g;
     const dur = duracionEscenas(g);
     const lista = el.createDiv({ cls: 'cp-nav-lista' });

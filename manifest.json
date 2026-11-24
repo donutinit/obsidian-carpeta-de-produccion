@@ -1,7 +1,7 @@
 {
   "id": "carpeta-de-produccion",
   "name": "Carpeta de producción",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "minAppVersion": "1.8.0",
   "description": "Escribe el guion en Fountain dentro de tus notas y arma la carpeta de producción: paginación, octavos, breakdown, listas, PDF y paneles para llenar el guion técnico y la ruta crítica.",
   "author": "Diego Ayala",

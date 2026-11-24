@@ -4,6 +4,8 @@ import { MARCA } from './enlinea';
 import { analizar, clasificarLineas } from './fountain';
 
 const mismo = (a: string, b: string) => a.trim().toLocaleLowerCase('es') === b.trim().toLocaleLowerCase('es');
+const sinAcentos = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const mismoSinAcentos = (a: string, b: string) => mismo(sinAcentos(a), sinAcentos(b));
 const escapar = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 function inicios(fuente: string): number[] {
@@ -17,6 +19,13 @@ function inicios(fuente: string): number[] {
 }
 
 /** Escribe una marca: `{cat:texto}`, con `|nombre` si difiere del texto y `|cantidad` si pasa de 1. */
+/** Un nombre que cabe en una marca: sin «{», «}», «|», «%» ni saltos, y sin espacios de más. */
+export const limpiarNombre = (s: string) =>
+  s
+    .replace(/[{}|%\n\r]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 export function escribirMarca(cat: string, texto: string, nombre?: string, cantidad = 1): string {
   const conNombre = (nombre !== undefined && nombre !== texto) || cantidad > 1 || !texto;
   return `{${cat}:${texto}${conNombre ? '|' + (nombre ?? texto) : ''}${cantidad > 1 ? '|' + cantidad : ''}}`;
@@ -141,6 +150,62 @@ export function copiarElementos(fuente: string, desde: number, hacia: number): C
     }
   }
   return nuevas.length ? [{ desde: pos, hasta: pos, texto: nuevas.map((n) => '\n' + n).join('') }] : [];
+}
+
+/**
+ * Agrega un elemento a la escena desde el breakdown: una marca oculta bajo su encabezado (o su línea de metadatos),
+ * que no se imprime ni mueve los octavos. Si la escena ya lo tiene, nada.
+ */
+export function agregarOculto(fuente: string, escena: number, cat: string, nombre: string, cantidad = 1): Cambio[] {
+  const n = limpiarNombre(nombre);
+  const g = n ? construir(fuente) : undefined;
+  const bd = g?.breakdown[escena];
+  const pos = bd ? puntoBajoEncabezado(fuente, escena) : null;
+  if (!g || !bd || pos === null) return [];
+  // Una escena con `reparto=` fija su reparto: lo agregado no se vería.
+  if (cat === 'rep' && g.doc.escenas[escena].meta.reparto !== undefined) return [];
+  const ya = cat === 'rep' ? bd.reparto : (bd.elementos[cat] ?? []).map((x) => x.nombre);
+  if (ya.some((x) => mismoSinAcentos(x, n))) return [];
+  return [{ desde: pos, hasta: pos, texto: `\n%%${escribirMarca(cat, '', n, Math.max(1, Math.floor(cantidad)))}%%` }];
+}
+
+/**
+ * La escena con ese número y encabezado; si el número cambió, la única con ese encabezado. Así, una hoja dibujada
+ * antes de editar el guion no escribe en otra escena. Si no es seguro cuál es, `null`.
+ */
+export function escenaPorFirma(fuente: string, firma: { numero: string; encabezado: string }): number | null {
+  const escenas = analizar(fuente).escenas;
+  const enc = (s: string) => s.replace(/\s+/g, ' ').trim().toLocaleUpperCase('es');
+  const num = (s: string) => s.replace(/\s+/g, '').toUpperCase();
+  const ambos = escenas.findIndex((e) => num(e.numero) === num(firma.numero) && enc(e.encabezado) === enc(firma.encabezado));
+  if (ambos >= 0) return ambos;
+  const mismos = escenas.flatMap((e, k) => (enc(e.encabezado) === enc(firma.encabezado) ? [k] : []));
+  return mismos.length === 1 ? mismos[0] : null;
+}
+
+/** Cuántas marcas tiene el elemento en la escena: las ocultas (agregadas desde el breakdown) y las de la acción. */
+export function marcasDeElemento(fuente: string, escena: number, cat: string, nombre: string): { ocultas: number; visibles: number } {
+  const r = rangoEscena(fuente, escena);
+  const out = { ocultas: 0, visibles: 0 };
+  if (!r) return out;
+  for (const m of marcas(fuente)) {
+    if (m.desde < r[0] || m.hasta > r[1] || m.cat !== cat || !mismo(nombreDe(m), nombre)) continue;
+    if (m.comentario) out.ocultas++;
+    else out.visibles++;
+  }
+  return out;
+}
+
+/** Quita la marca `k` de una línea de marcas ocultas (`%%{ut:|Llaves} {equipo:|Dron}%%`). `null` si era la única. */
+export function quitarDeLineaOculta(linea: string, k: number): string | null {
+  const m = /^(\s*%%)(.*?)(%%\s*)$/.exec(linea);
+  if (!m) return linea;
+  const todas = [...m[2].matchAll(new RegExp(MARCA.source, 'g'))];
+  const x = todas[k];
+  if (!x || x.index === undefined) return linea;
+  if (todas.length === 1) return null;
+  const resto = (m[2].slice(0, x.index) + m[2].slice(x.index + x[0].length)).replace(/\s+/g, ' ').trim();
+  return `${m[1]}${resto}${m[3]}`;
 }
 
 /** Renombra un elemento en todo el guion; con un nombre que ya existe, los fusiona. */

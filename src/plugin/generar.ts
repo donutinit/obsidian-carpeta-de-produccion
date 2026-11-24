@@ -1,7 +1,6 @@
 import { normalizePath, Notice, TFile, TFolder, type App } from 'obsidian';
 import {
   asegurarIds,
-  construir,
   csvDesglose,
   csvElementos,
   csvLocaciones,
@@ -13,7 +12,8 @@ import {
   type Guion,
 } from '../motor';
 import { aplicarCambios, textoDe } from './cambios';
-import { buscarProyecto, leerConfigProyecto, propiedades } from './proyecto';
+import { buscarProyecto, propiedades } from './proyecto';
+import { construirDe } from './guion';
 
 const LETRAS = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
@@ -100,7 +100,7 @@ async function asegurarCarpeta(app: App, ruta: string): Promise<void> {
  */
 export async function generarNotasEscena(app: App, guion: TFile): Promise<void> {
   await asignarIds(app, guion);
-  const g = construir(await textoDe(app, guion), leerConfigProyecto(app, guion.path));
+  const g = await construirDe(app, guion, await textoDe(app, guion));
   const dir = guion.parent && guion.parent.path !== '/' ? guion.parent.path : '';
   const carpeta = normalizePath(`${dir ? dir + '/' : ''}Escenas`);
   await asegurarCarpeta(app, carpeta);
@@ -148,7 +148,7 @@ export async function generarNotasEscena(app: App, guion: TFile): Promise<void> 
 
 /** Los cuatro CSV del breakdown en `<proyecto>/Exportación/`. */
 export async function exportarCSV(app: App, guion: TFile): Promise<void> {
-  const g = construir(await textoDe(app, guion), leerConfigProyecto(app, guion.path));
+  const g = await construirDe(app, guion, await textoDe(app, guion));
   const dir = guion.parent && guion.parent.path !== '/' ? guion.parent.path : '';
   const carpeta = normalizePath(`${dir ? dir + '/' : ''}Exportación`);
   await asegurarCarpeta(app, carpeta);

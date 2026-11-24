@@ -1,5 +1,8 @@
 import type { Guion } from './index';
-import { GENERICOS, nombrePropio } from './breakdown';
+import { GENERICOS, nombrePropio, presentaciones } from './breakdown';
+import type { Cambio } from './escenas';
+import { cabezaDeTabla, filasDeTabla } from './plan';
+import { celdaDeTabla, escribirCelda } from './tablas';
 import { analizarEnLinea, textoPlano } from './enlinea';
 import { formatearOctavos } from './octavos';
 import type { Documento } from './tipos';
@@ -323,4 +326,129 @@ INT. LUGAR - DÍA
 
 Escribe aquí la primera acción.
 `;
+}
+
+// ---------- Propuesta de talento ----------
+
+/** «1, 3, 4, 5, 6, 9, 10» → «1, 3–6, 9, 10»: tres o más escenas seguidas se juntan. */
+export function rangosDeEscenas(numeros: string[]): string {
+  const out: string[] = [];
+  const entero = (s: string) => /^\d+$/.test(s);
+  for (let i = 0; i < numeros.length; ) {
+    let j = i;
+    if (entero(numeros[i])) while (j + 1 < numeros.length && entero(numeros[j + 1]) && Number(numeros[j + 1]) === Number(numeros[j]) + 1) j++;
+    if (j - i >= 2) out.push(`${numeros[i]}–${numeros[j]}`);
+    else out.push(...numeros.slice(i, j + 1));
+    i = j + 1;
+  }
+  return out.join(', ');
+}
+
+export interface OpcionPersonaje {
+  nombre: string;
+  /** La del guion («AURELIO (78)»); si no la trae, la de su ficha; si no, vacía. */
+  edad: string;
+  /** Sus escenas, en rangos. */
+  escenas: string;
+}
+
+/**
+ * Los personajes para la propuesta de talento, con su edad y sus escenas. Primero los de `orden` (orden_reparto),
+ * luego los demás en orden de aparición. `edades` son las de las fichas, por nombre.
+ */
+export function opcionesDePersonaje(g: Guion, o: { edades?: Record<string, string>; orden?: string[] } = {}): OpcionPersonaje[] {
+  const nombres = personajesDelGuion(g);
+  const orden = (o.orden ?? []).map((x) => nombres.find((n) => igual(n, x))).filter((x): x is string => !!x);
+  const resto = nombres.filter((n) => !orden.some((x) => igual(x, n)));
+  const presentados = presentaciones(g.doc);
+  const deFicha = Object.entries(o.edades ?? {});
+  return [...orden, ...resto].map((nombre) => ({
+    nombre,
+    edad: presentados.find((p) => igual(p.nombre, nombre))?.edad ?? deFicha.find(([k]) => igual(k, nombre))?.[1]?.trim() ?? '',
+    escenas: rangosDeEscenas(escenasDePersonaje(g, nombre).map((e) => e.escena)),
+  }));
+}
+
+const encabezado = (s: string) =>
+  s
+    .replace(/[*_`~.]/g, '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+const celdaVacia = (t: string) => !t.trim() || /^[—-]$/.test(t.trim());
+/** Lo que se lee de una celda: «[[María]]», «[[María|Mari]]» o «**María**» son María. */
+const visible = (t: string) =>
+  t
+    .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, a: string, b?: string) => b ?? a)
+    .replace(/[*_`]/g, '')
+    .trim();
+/** Lo que se llena solo al elegir un personaje, según la columna (o la fila, en un «Dato | Valor»). */
+const derivado = (h: string, o: OpcionPersonaje) => (h === 'edad del personaje' ? o.edad : h === 'escenas' ? o.escenas : '');
+
+/** Al elegir el personaje `o` en una celda: su nombre ahí y, en la misma fila (o tabla «Dato | Valor»), su edad y sus escenas. */
+export function rellenoDePersonaje(fuente: string, linea: number, fila: number, columna: number, o: OpcionPersonaje): Cambio[] {
+  const propia = celdaDeTabla(fuente, linea, fila, columna);
+  if (!propia) return [];
+  const cambios: Cambio[] = [escribirCelda(propia, o.nombre)];
+  // Con otro personaje, lo que no se sabe de él queda en «—»: no se hereda la edad del anterior.
+  const otro = !igual(visible(propia.texto), o.nombre);
+  const valorDe = (h: string) => derivado(h, o) || (otro && (h === 'edad del personaje' || h === 'escenas') ? '—' : '');
+  if (propia.columnas === 2 && propia.columna === 1 && encabezado(propia.etiqueta) === 'personaje') {
+    for (let f = 0; ; f++) {
+      const et = celdaDeTabla(fuente, linea, f, 0);
+      if (!et) break;
+      const valor = f === fila ? '' : valorDe(encabezado(et.texto));
+      const c = valor ? celdaDeTabla(fuente, linea, f, 1) : null;
+      if (c) cambios.push(escribirCelda(c, valor));
+    }
+  } else {
+    for (let k = 0; k < propia.columnas; k++) {
+      const c = k === columna ? null : celdaDeTabla(fuente, linea, fila, k);
+      const valor = c ? valorDe(encabezado(c.encabezado)) : '';
+      // El mismo personaje sin edad conocida conserva la que ya tenía.
+      if (c && valor) cambios.push(escribirCelda(c, valor));
+    }
+  }
+  return cambios.sort((a, b) => a.desde - b.desde);
+}
+
+/**
+ * «Llenar toda la tabla»: una fila por personaje, con su edad y sus escenas. Conserva lo escrito en las demás columnas
+ * (el actor), deja al final las filas de quien no está en el guion y quita las filas vacías.
+ */
+export function llenarTablaDePersonajes(fuente: string, linea: number, opciones: OpcionPersonaje[]): Cambio[] {
+  const h = cabezaDeTabla(fuente, linea);
+  const cP = h.indexOf('personaje');
+  if (cP < 0) return [];
+  const viejas = filasDeTabla(fuente, linea, h.length).map((f) => f.map((x) => x.trim()));
+  const usadas = new Set<number>();
+  const nuevas: string[][] = [];
+  for (const o of opciones) {
+    // Todas sus filas (dos candidatos para un personaje), juntas y en su orden; si no tiene, una nueva.
+    const suyas = viejas.flatMap((f, i) => (!usadas.has(i) && igual(visible(f[cP] ?? ''), o.nombre) ? [i] : []));
+    suyas.forEach((i) => usadas.add(i));
+    for (const base of suyas.length ? suyas.map((i) => viejas[i]) : [h.map(() => '')])
+      nuevas.push(
+        h.map((col, c) => {
+          const previo = celdaVacia(base[c] ?? '') ? '—' : base[c];
+          // El nombre como ya estaba escrito (con su enlace o sus negritas).
+          return c === cP ? (suyas.length ? base[c] : o.nombre) : derivado(col, o) || previo;
+        }),
+      );
+  }
+  viejas.forEach((f, i) => {
+    if (!usadas.has(i) && !f.every(celdaVacia)) nuevas.push(f.map((x) => (celdaVacia(x) ? '—' : x)));
+  });
+  const lineas = fuente.split('\n');
+  const inicio = (n: number) => lineas.slice(0, n).reduce((s, l) => s + l.length + 1, 0);
+  const texto = nuevas.map((f) => `| ${f.join(' | ')} |`).join('\n');
+  if (!viejas.length) {
+    const fin = inicio(linea + 2) - 1;
+    return [{ desde: fin, hasta: fin, texto: '\n' + texto }];
+  }
+  const desde = inicio(linea + 2);
+  const hasta = inicio(linea + 1 + viejas.length) + lineas[linea + 1 + viejas.length].length;
+  return [{ desde, hasta, texto }];
 }

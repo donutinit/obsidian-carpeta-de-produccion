@@ -1,3 +1,5 @@
+import { ocultasEditor } from './editor/ocultas';
+import { anchoGuion } from './editor/ancho';
 import { Plugin } from 'obsidian';
 import { mezclarPreferencias, PestanaAjustes, preferencias } from './ajustes';
 import { registrarBloques } from './bloques';
@@ -20,6 +22,7 @@ import { concentracion } from './editor/concentracion';
 import { registrarPaneles } from './paneles';
 import { registrarRevisionGuion } from './panel-revision';
 import { registrarPersonajes } from './comandos-personajes';
+import { registrarStoryboard } from './storyboard';
 import { VISTA_GUION, VistaPrevia } from './vista-previa';
 
 export default class CarpetaPlugin extends Plugin {
@@ -43,11 +46,12 @@ export default class CarpetaPlugin extends Plugin {
     registrarPaneles(this);
     registrarRevisionGuion(this);
     registrarPersonajes(this);
+    registrarStoryboard(this);
     this.registerView(VISTA_TARJETAS, (leaf) => new VistaTarjetas(leaf));
     this.addRibbonIcon('clapperboard', 'Vista previa del guion', () => void abrirVistaPrevia(this.app));
     this.addRibbonIcon('list-ordered', 'Navegador de escenas', () => void abrirNavegador(this.app));
     this.addRibbonIcon('clipboard-list', 'Breakdown de la escena', () => void abrirPanelBreakdown(this.app));
-    this.registerEditorExtension([teclasGuion(), formatoGuion, marcasEditor, teclasSubrayado, marcasDePagina, seguidorCursor, concentracion]);
+    this.registerEditorExtension([teclasGuion(), formatoGuion, marcasEditor, teclasSubrayado, marcasDePagina, seguidorCursor, concentracion, ocultasEditor, anchoGuion]);
     this.registerEditorSuggest(new Sugeridor(this.app));
   }
 

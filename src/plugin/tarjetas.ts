@@ -50,7 +50,7 @@ export class VistaTarjetas extends ItemView {
 
   async render(texto?: string) {
     const f = this.ruta ? this.app.vault.getAbstractFileByPath(this.ruta) : null;
-    const g = f instanceof TFile ? await construirDe(this.app, f, texto) : null;
+    const g = f instanceof TFile ? await construirDe(this.app, f, texto, { equipo: false }) : null;
     const el = this.contentEl;
     const arriba = el.scrollTop;
     el.empty();

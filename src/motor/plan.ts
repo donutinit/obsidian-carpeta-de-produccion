@@ -12,8 +12,9 @@ const normal = (s: string) =>
     .trim()
     .toLowerCase();
 const vacia = (t: string) => !t.trim() || /^[—-]$/.test(t.trim());
+const sinAcentos = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
 const clave = (s: string) => s.replace(/\s+/g, '').toUpperCase();
-const COL_ESCENA = /^(esc|escena|sc|(n|no|num|numero) ?(de )?escena)$/;
+export const COL_ESCENA = /^(esc|escena|sc|(n|no|num|numero) ?(de )?escena)$/;
 
 /** `9:00`, `09:00`, `9:00 AM`, `3:45 PM`, `15:45`, `9 am`, `9`, `9h`, `9h00`, `09.00` o `9:00 hrs`, en minutos desde la medianoche; lo demás, `null`. */
 export function leerHora(s: string): number | null {
@@ -61,13 +62,13 @@ export function leerMinutos(s: string): number | null {
 }
 
 /** Los encabezados de la tabla que empieza en `L`, normalizados. */
-function cabeza(fuente: string, L: number): string[] {
+export function cabezaDeTabla(fuente: string, L: number): string[] {
   const c = celdaDeTabla(fuente, L, 0, 0);
   return c ? Array.from({ length: c.columnas }, (_, k) => normal(celdaDeTabla(fuente, L, 0, k)?.encabezado ?? '')) : [];
 }
 
 /** Las filas de la tabla, como texto de cada celda. */
-function filas(fuente: string, L: number, columnas: number): string[][] {
+export function filasDeTabla(fuente: string, L: number, columnas: number): string[][] {
   const out: string[][] = [];
   for (let f = 0; celdaDeTabla(fuente, L, f, 0); f++) out.push(Array.from({ length: columnas }, (_, k) => celdaDeTabla(fuente, L, f, k)?.texto ?? ''));
   return out;
@@ -83,11 +84,11 @@ export interface DiaPlan {
 export function diasDelPlan(fuente: string): DiaPlan[] {
   const dias = new Map<number, string[]>();
   for (const L of iniciosDeTabla(fuente)) {
-    const h = cabeza(fuente, L);
+    const h = cabezaDeTabla(fuente, L);
     const cDia = h.findIndex((x) => x === 'dia');
     const cEsc = h.findIndex((x) => COL_ESCENA.test(x));
     if (cDia < 0 || cEsc < 0) continue;
-    for (const fila of filas(fuente, L, h.length)) {
+    for (const fila of filasDeTabla(fuente, L, h.length)) {
       const d = parseInt(fila[cDia].replace(/[^\d]+/g, ' ').trim(), 10);
       if (!Number.isFinite(d) || vacia(fila[cEsc])) continue;
       const escenas = fila[cEsc]
@@ -123,8 +124,8 @@ export function datosDeDias(fuente: string): Map<number, DatosDia> {
     const sig = lineas.findIndex((x, j) => j > i && /^(#{1,6})\s/.test(x.trim()) && (/^(#{1,6})/.exec(x.trim())?.[1].length ?? 7) <= nivel);
     const datos: DatosDia = {};
     for (const L of tablas.filter((t) => t > i && (sig < 0 || t < sig))) {
-      if (cabeza(fuente, L).length !== 2) continue;
-      for (const [etiqueta, valor] of filas(fuente, L, 2)) {
+      if (cabezaDeTabla(fuente, L).length !== 2) continue;
+      for (const [etiqueta, valor] of filasDeTabla(fuente, L, 2)) {
         if (vacia(valor)) continue;
         const e = normal(etiqueta).replace(/:$/, '').trim();
         if (e === 'fecha') datos.fecha = valor.trim();
@@ -159,7 +160,7 @@ export interface PlanoCompleto {
 export function planosCompletos(fuente: string): PlanoCompleto[] {
   const out: PlanoCompleto[] = [];
   for (const L of iniciosDeTabla(fuente)) {
-    const h = cabeza(fuente, L);
+    const h = cabezaDeTabla(fuente, L);
     const col = (re: RegExp) => h.findIndex((x) => re.test(x));
     const cEsc = col(COL_ESCENA);
     const cNum = col(/^((n|no|num|numero) ?(de )?)(plano|toma)$/);
@@ -171,7 +172,7 @@ export function planosCompletos(fuente: string): PlanoCompleto[] {
     const cDur = col(/^duracion( en pantalla)?$/);
     const cMin = col(/^(tiempo de (grabacion|rodaje)|minutos)$/);
     const de = (fila: string[], k: number) => (k < 0 || vacia(fila[k] ?? '') ? '' : fila[k].trim());
-    for (const fila of filas(fuente, L, h.length)) {
+    for (const fila of filasDeTabla(fuente, L, h.length)) {
       if (vacia(fila[cEsc] ?? '')) continue;
       out.push({
         escena: fila[cEsc].trim(),
@@ -281,14 +282,22 @@ export interface Llamado {
   escenas: { escena: string; set: string; momento: string; personajes: string[]; planos: number; octavos: string; horario: string }[];
   /** Cada personaje del día con su primer plano y su llamado, una hora antes. */
   reparto: { personaje: string; llamado: number; primerPlano: number }[];
+  /** El equipo especial del día, en el orden del día, con las escenas que lo usan. */
+  equipo: { equipo: string; escenas: string[] }[];
 }
 
 /** La hoja de llamado del día: sus escenas en orden y el llamado de cada personaje. */
 export function armarLlamado(g: Guion, plan: PlanDia): Llamado {
   const escenas: Llamado['escenas'] = [];
   const reparto: Llamado['reparto'] = [];
+  const equipo: Llamado['equipo'] = [];
   for (const f of plan.filas) {
     if (f.comida) continue;
+    for (const x of g.breakdown[f.indice]?.elementos.equipo ?? []) {
+      let q = equipo.find((y) => sinAcentos(y.equipo) === sinAcentos(x.nombre));
+      if (!q) equipo.push((q = { equipo: x.nombre, escenas: [] }));
+      if (!q.escenas.includes(f.escena)) q.escenas.push(f.escena);
+    }
     let e = escenas.find((x) => x.escena === f.escena);
     if (!e) {
       e = { escena: f.escena, set: f.set, momento: f.momento, personajes: f.talentos, planos: 0, octavos: formatearOctavos(g.octavos.porEscena[f.indice] ?? 0), horario: '' };
@@ -299,5 +308,5 @@ export function armarLlamado(g: Guion, plan: PlanDia): Llamado {
     e.horario = `${horaTexto(ultima[0].hora)}–${horaTexto(ultima[ultima.length - 1].hora + ultima[ultima.length - 1].minutos)}`;
     for (const p of f.talentos) if (!reparto.some((r) => r.personaje === p)) reparto.push({ personaje: p, llamado: f.hora - 60, primerPlano: f.hora });
   }
-  return { escenas, reparto };
+  return { escenas, reparto, equipo };
 }

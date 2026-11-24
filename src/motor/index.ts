@@ -38,9 +38,11 @@ export * from './timing';
 export * from './revisor';
 export * from './plan';
 export * from './personajes';
+export * from './equipo';
+export * from './storyboard';
 
 export type { BreakdownEscena } from './breakdown';
-export { nombrePropio } from './breakdown';
+export { nombrePropio, presentaciones, type ElementoBreakdown } from './breakdown';
 export { aplicarMarca, type ResultadoMarca } from './marcas';
 
 export interface Guion {
@@ -59,5 +61,5 @@ export function construir(fuente: string, parcial?: Partial<Config>): Guion {
   const bloques = maquetar(doc, config);
   const paginas = paginar(bloques, config);
   const octavos = calcularOctavos(paginas, doc.escenas.length, config);
-  return { doc, bloques, paginas, octavos, breakdown: armarBreakdown(doc, bloques, { conocidos: config.personajesConocidos }), config };
+  return { doc, bloques, paginas, octavos, breakdown: armarBreakdown(doc, bloques, { conocidos: config.personajesConocidos, noPersonajes: config.noSonPersonajes }), config };
 }

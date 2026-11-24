@@ -268,7 +268,24 @@ export interface OpcionesLista {
   alElegir: (op: OpcionLista) => void;
   /** Si está, aparece «Quitar» en el pie. */
   alQuitar?: () => void;
+  /**
+   * Si está, el buscador siempre se ve y lo escrito que no esté en la lista se puede agregar con la última fila,
+   * «Agregar «…»». No hay «Escribir a mano»: no hay celda a la cual volver.
+   */
+  escribir?: (texto: string) => void;
+  /** Botones del pie que hacen algo más que elegir una opción («Llenar toda la tabla»). */
+  acciones?: { texto: string; etiqueta: string; fn: () => void }[];
 }
+
+/** La fila «Agregar «…»» de una lista con `escribir`. */
+const NUEVO = '\u0000nuevo';
+const comparable = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
 
 /** Una lista con filtro (si es larga). Teclado: escribir filtra, flechas, Enter y Esc. */
 export class PanelLista extends Panel {
@@ -283,8 +300,9 @@ export class PanelLista extends Panel {
   ) {
     super(ancla, 'cp-lista', o.titulo);
     this.el.createDiv({ cls: 'cp-panel-titulo', text: o.titulo });
-    if (o.opciones.length > 8) {
-      this.filtro = this.el.createEl('input', { cls: 'cp-lista-filtro', attr: { type: 'text', placeholder: 'Filtrar…', 'aria-label': 'Filtrar' } });
+    if (o.opciones.length > 8 || o.escribir) {
+      const ph = o.escribir ? 'Buscar o escribir…' : 'Filtrar…';
+      this.filtro = this.el.createEl('input', { cls: 'cp-lista-filtro', attr: { type: 'text', placeholder: ph, 'aria-label': ph.slice(0, -1) } });
       this.filtro.addEventListener('input', () => this.pintar(0));
     }
     this.lista = this.el.createDiv({ cls: 'cp-lista-ops', attr: { role: 'listbox', 'aria-label': o.titulo } });
@@ -293,7 +311,9 @@ export class PanelLista extends Panel {
       const quitar = o.alQuitar;
       this.boton(pie, 'Quitar', 'Dejar la celda vacía', () => this.terminar(quitar));
     }
-    this.botonAMano(pie);
+    for (const a of o.acciones ?? []) this.boton(pie, a.texto, a.etiqueta, () => this.terminar(a.fn));
+    if (!o.escribir) this.botonAMano(pie);
+    if (!pie.childElementCount) pie.remove();
     const k = o.opciones.findIndex((x) => x.valor === o.actual);
     this.pintar(Math.max(0, k));
     this.iniciar();
@@ -306,10 +326,13 @@ export class PanelLista extends Panel {
   }
 
   private pintar(activo: number) {
-    this.visibles = filtrarOpciones(this.o.opciones, this.filtro?.value ?? '');
+    const texto = this.filtro?.value.trim() ?? '';
+    this.visibles = filtrarOpciones(this.o.opciones, texto);
+    // Lo escrito que no está en la lista va al final: Enter sigue eligiendo la primera coincidencia.
+    if (this.o.escribir && texto && !this.o.opciones.some((x) => comparable(x.valor) === comparable(texto))) this.visibles.push({ valor: texto, clave: NUEVO, etiqueta: `Agregar «${texto}»` });
     this.activo = Math.min(activo, Math.max(0, this.visibles.length - 1));
     this.lista.empty();
-    if (!this.visibles.length) this.lista.createDiv({ cls: 'cp-lista-nada', text: 'Nada coincide.' });
+    if (!this.visibles.length) this.lista.createDiv({ cls: 'cp-lista-nada', text: this.o.escribir ? 'Escribe el nombre para agregarlo.' : 'Nada coincide.' });
     this.visibles.forEach((x, k) => {
       const cls = ['cp-lista-op'];
       if (x.valor === this.o.actual) cls.push('is-elegido');
@@ -320,8 +343,13 @@ export class PanelLista extends Panel {
       });
       b.createSpan({ cls: 'cp-lista-valor', text: x.etiqueta ?? x.valor });
       if (x.detalle) b.createSpan({ cls: 'cp-lista-detalle', text: x.detalle });
-      b.addEventListener('click', () => this.terminar(() => this.o.alElegir(x)));
+      b.addEventListener('click', () => this.terminar(() => this.elegir(x)));
     });
+  }
+
+  private elegir(x: OpcionLista) {
+    if (x.clave === NUEVO && this.o.escribir) this.o.escribir(x.valor);
+    else this.o.alElegir(x);
   }
 
   private enfocarActivo() {
@@ -341,10 +369,61 @@ export class PanelLista extends Panel {
     if (e.key === 'ArrowDown') this.mover(1);
     else if (e.key === 'ArrowUp') this.mover(-1);
     else if (e.key === 'Enter') {
+      // Enter sobre un botón del pie («Llenar toda la tabla») hace lo de ese botón.
+      if ((e.target as HTMLElement | null)?.closest?.('.cp-panel-pie')) return false;
       const x = this.visibles[this.activo];
-      if (x) this.terminar(() => this.o.alElegir(x));
+      if (x) this.terminar(() => this.elegir(x));
     } else return false;
     return true;
+  }
+}
+
+// ---------- Texto ----------
+
+export interface OpcionesTexto {
+  titulo: string;
+  campos: { etiqueta: string; valor: string }[];
+  alGuardar: (valores: string[]) => void;
+}
+
+/** Uno o varios renglones de texto («Acción», «Diálogo» y «Sonido»). Enter guarda; Esc cancela. */
+export class PanelTexto extends Panel {
+  private entradas: HTMLInputElement[] = [];
+
+  constructor(
+    ancla: HTMLElement,
+    private o: OpcionesTexto,
+  ) {
+    super(ancla, 'cp-texto', o.titulo);
+    this.el.createDiv({ cls: 'cp-panel-titulo', text: o.titulo });
+    for (const c of o.campos) {
+      const l = this.el.createEl('label', { cls: 'cp-texto-campo' });
+      l.createSpan({ text: c.etiqueta });
+      const i = l.createEl('input', { attr: { type: 'text' } });
+      i.value = c.valor;
+      this.entradas.push(i);
+    }
+    const pie = this.el.createDiv({ cls: 'cp-panel-pie' });
+    this.boton(pie, 'Cancelar', 'Cancelar', () => this.cerrar());
+    this.boton(pie, 'Guardar', 'Guardar', () => this.guardar(), 'mod-cta');
+    this.iniciar();
+  }
+
+  protected enfocar(): void {
+    this.entradas[0]?.focus({ preventScroll: true });
+    this.entradas[0]?.select();
+  }
+
+  protected tecla(e: KeyboardEvent): boolean {
+    // Enter sobre «Cancelar» o «Guardar» hace lo de ese botón.
+    if (e.key !== 'Enter' || (e.target as HTMLElement | null)?.tagName === 'BUTTON') return false;
+    this.guardar();
+    return true;
+  }
+
+  private guardar() {
+    const valores = this.entradas.map((i) => i.value);
+    this.terminar(() => this.o.alGuardar(valores));
   }
 }
 

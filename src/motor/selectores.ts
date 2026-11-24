@@ -4,7 +4,7 @@ import { formatearOctavos } from './octavos';
 import { celdaDeTabla, escribirCelda, esCeldaDeFecha, iniciosDeTabla, type Celda } from './tablas';
 
 /** Qué panel abre una celda, según su columna. */
-export type TipoCelda = 'fecha' | 'escena' | 'plano' | 'movimiento' | 'angulo' | 'lente' | 'tecnica';
+export type TipoCelda = 'fecha' | 'escena' | 'plano' | 'movimiento' | 'angulo' | 'lente' | 'tecnica' | 'personaje';
 
 /** Sin negritas, acentos, puntos ni mayúsculas, con los espacios juntos. */
 const normal = (s: string) =>
@@ -32,11 +32,32 @@ const COLUMNAS: [TipoCelda, RegExp][] = [
 export function tipoDeCelda(c: Celda, fuente?: string, linea?: number): TipoCelda | null {
   if (esCeldaDeFecha(c)) return 'fecha';
   const h = normal(c.encabezado);
+  if (fuente !== undefined && linea !== undefined && esCeldaDePersonaje(c, fuente, linea)) return 'personaje';
   const tipo = COLUMNAS.find(([, re]) => re.test(h))?.[0] ?? null;
   if (tipo === 'plano' && fuente !== undefined && linea !== undefined) {
     for (let k = 0; k < c.columnas; k++) if (normal(celdaDeTabla(fuente, linea, 0, k)?.encabezado ?? '') === 'abreviatura') return null;
   }
   return tipo;
+}
+
+/**
+ * La celda donde se elige un personaje: la columna «Personaje» de una tabla con «Edad del personaje» o «Escenas»
+ * (la propuesta de talento), o el valor de la fila «Personaje» de un «Dato | Valor» con «Edad del personaje».
+ */
+function esCeldaDePersonaje(c: Celda, fuente: string, linea: number): boolean {
+  if (c.columnas === 2 && c.columna === 1 && normal(c.etiqueta) === 'personaje') {
+    for (let f = 0; ; f++) {
+      const et = celdaDeTabla(fuente, linea, f, 0);
+      if (!et) return false;
+      if (normal(et.texto) === 'edad del personaje') return true;
+    }
+  }
+  if (normal(c.encabezado) !== 'personaje') return false;
+  for (let k = 0; k < c.columnas; k++) {
+    const h = normal(celdaDeTabla(fuente, linea, 0, k)?.encabezado ?? '');
+    if (h === 'edad del personaje' || h === 'escenas') return true;
+  }
+  return false;
 }
 
 /** El guion de una nota: el de su carpeta o el de la carpeta de arriba más cercana. Nunca uno de una carpeta vecina. */
@@ -188,6 +209,12 @@ function trozosTecnica(texto: string): { t: string; sep: string }[] {
   out.push({ t: actual, sep: '' });
   return out.filter((x) => x.t.trim());
 }
+
+/** Los trozos de una celda técnica («24 mm · steadicam, grúa» → «24 mm», «steadicam», «grúa»). */
+export const partesTecnica = (texto: string): string[] =>
+  trozosTecnica(texto)
+    .map((x) => x.t.trim())
+    .filter(Boolean);
 
 export function leerTecnica(texto: string, listas: ListasTecnicas): Tecnica {
   const t: Tecnica = { resto: [] };

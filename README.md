@@ -44,6 +44,7 @@ Las tablas del proyecto (ruta crítica, guion técnico, shooting list, hojas de 
   - sin dobles espacios;
   - mayúsculas en encabezados y personajes.
 - **Diccionarios del proyecto:** se editan con «Editar diccionarios del proyecto».
+- **Ancho de página:** en el editor, el guion mide lo que la página (60 columnas de Courier), con o sin «Readable line length». Así el personaje, la acotación y el diálogo quedan en su sangría.
 - **Marcas en el editor:** el corte de página «── 2 ──» y, si quieres, los números de escena.
 - **Navegador de escenas:** octavos, duración y palabras. Arrastrar una escena la reordena, y Ctrl+Z lo deshace.
 - **Comandos «Párrafo: …»:** sirven para forzar el tipo de párrafo. No traen atajo de teclado; te sugerimos asignarles Ctrl+Alt+1…8 en Configuración → Atajos de teclado.
@@ -57,6 +58,7 @@ Las tablas del proyecto (ruta crítica, guion técnico, shooting list, hojas de 
   - Puedes agregar las tuyas en la ficha: `categorias_extra: ["vfx: Efectos visuales"]`.
 - **Reparto automático:**
   - cuenta a quien habla, salvo si solo habla en V.O.;
+  - cuenta a quien la acción presenta en mayúsculas con su edad, aunque no hable («Un POLICÍA (35) vigila»). Si algo así no es personaje, su × en el breakdown lo guarda en `no_son_personajes` de la ficha del proyecto;
   - cuenta a los personajes conocidos que se nombran con mayúscula en la acción;
   - cuenta a los marcados con `{rep:…}`;
   - `%%escena: reparto=…%%` reemplaza la lista de una escena.
@@ -65,6 +67,17 @@ Las tablas del proyecto (ruta crítica, guion técnico, shooting list, hojas de 
   - copiar los elementos de una escena a otra;
   - renombrar o fusionar un elemento;
   - asignar identificadores a las escenas.
+- **Breakdown a mano, sin marcas:**
+  - en la hoja del bloque `carpeta-breakdown` y en el panel «Breakdown de la escena», cada categoría tiene «+ Agregar»;
+  - la lista sugiere lo que ya usaste en otras escenas y, en equipo especial, Steadicam, grúa, dron, dolly y otros. También puedes escribir algo nuevo; «Extras ×6» lleva cantidad;
+  - la × lo quita. Si está subrayado en el guion, pregunta antes y deja el texto;
+  - en el reparto se agrega a quien no habla, y solo eso se quita;
+  - se guarda en el guion como nota oculta bajo el encabezado de la escena, `%%{equipo:|Steadicam}%%`. No se imprime ni cambia los octavos. En la vista en vivo se ve como una etiqueta con su ×; en modo fuente, como texto.
+- **Equipo especial del guion técnico:** el equipo de cada plano entra solo al breakdown de su escena, desde las columnas «Movimiento» o «Descripción técnica».
+  - Se reconocen Steadicam, gimbal, grúa (o jib), dron, dolly, slider, Easyrig, rig de auto y cámara de alta velocidad;
+  - dolly in, dolly out y travelling cuentan como «Dolly»;
+  - lo demás (fija, paneo, tilt, en mano) no pide equipo.
+  Lo que viene de ahí lleva ⚙ y se cambia en el guion técnico.
 - **Panel «Breakdown de la escena»:** los elementos de la escena donde está el cursor.
 - **Bloques para cualquier nota del proyecto:**
   - `carpeta-guion` y `carpeta-octavos`;
@@ -89,6 +102,7 @@ Al pulsar una celda de una tabla en un documento del proyecto se abre un panel. 
 | Plano | Las abreviaturas de la tabla «Abreviatura \| Plano» de la nota, o las de fábrica (G.P.G., P.G., P.M.C., P.P.…). Conserva la descripción que ya escribiste. |
 | Movimiento, Ángulo, Lente | Listas que se cambian en la ficha del proyecto: `movimientos`, `angulos` y `lentes`. |
 | Descripción técnica | Lente, movimiento y ángulo juntos: «35 mm · paneo · picada». |
+| Personaje (en la propuesta de talento) | Los personajes con su edad y sus escenas. Al elegir uno, llena «Edad del personaje» y «Escenas» de la fila, o de su tabla «Dato \| Valor». «Llenar toda la tabla» pone una fila por personaje y conserva el actor que ya escribiste. La edad sale del guion («AURELIO (78)») o, si no está, de la propiedad `edad` de su ficha. |
 
 - **Teclado:** flechas, Enter y Esc; en las listas largas, escribir filtra.
 - **Escribir a mano:** el botón «Escribir a mano» del panel, Esc, o Alt+clic en la celda para que no se abra el panel.
@@ -96,6 +110,15 @@ Al pulsar una celda de una tabla en un documento del proyecto se abre un panel. 
 - **Modos:** funciona en la vista en vivo y en la vista de lectura.
 - **Seguridad:** nunca escribe si la nota cambió mientras elegías.
 - **Apagarlo:** en los ajustes, «Paneles en las tablas».
+
+**Storyboard desde el guion técnico**
+
+Los datos de cada viñeta viven en el guion técnico; el storyboard los muestra y los cambia ahí. Así no se pueden descuadrar.
+
+- **Armar:** «Armar storyboard desde el guion técnico» (en la paleta, o el botón arriba de la nota del storyboard) pone una sección «### E1 · P1» por plano, bajo su escena y en su orden. Si la nota no existe, la crea junto al guion.
+- **Volver a armar:** agrega los planos nuevos y nunca borra un dibujo. Un plano que ya no está en el guion técnico pasa al final con sus dibujos.
+- **Cada viñeta muestra:** plano, lente, ángulo, movimiento, acción, y sonido y diálogo. Al pulsar una celda se abre su panel, y lo que eliges se escribe en la fila del guion técnico.
+- **Dibujar** (con el plugin Excalidraw): crea el dibujo con un cuadro 16:9 y un nombre que no se repite («Mi corto - E1 P1»), lo guarda en `Storyboard/`, lo pega arriba de la viñeta y lo abre.
 
 **Entregar**
 
@@ -155,7 +178,8 @@ Al pulsar una celda de una tabla en un documento del proyecto se abre un panel. 
    Una escena sin planos en el guion técnico va completa, con su tiempo calculado por octavos.
 4. En las hojas de llamado, el bloque `carpeta-llamado` arma por día:
    - las escenas, con set, personajes, planos, octavos y horario;
-   - el reparto con su llamado, una hora antes de su primer plano.
+   - el reparto con su llamado, una hora antes de su primer plano;
+   - el equipo especial del día, con las escenas que lo usan.
    El llamado de crew es dos horas antes de la primera toma.
 
 Cada plano dura lo que diga la columna «Tiempo de grabación» del guion técnico: `45`, `45 min`, `1:15` o `1h30`. La plantilla no la trae, así que agrégala si quieres horarios reales.

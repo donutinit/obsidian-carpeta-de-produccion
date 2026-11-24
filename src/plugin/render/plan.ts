@@ -82,5 +82,13 @@ export function renderLlamado(padre: HTMLElement, dias: { plan: PlanDia; llamado
       llamado.reparto.map((r) => [r.personaje, horaTexto(r.llamado), horaTexto(r.primerPlano)]),
       [1, 2],
     );
+    if (llamado.equipo.length)
+      tablaConCopia(
+        caja,
+        `Equipo especial del día ${plan.dia}`,
+        ['Equipo', 'Escenas'],
+        llamado.equipo.map((e) => [e.equipo, e.escenas.join(', ')]),
+        [],
+      );
   }
 }

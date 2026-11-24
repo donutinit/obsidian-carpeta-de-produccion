@@ -11,7 +11,9 @@ import {
   iniciosDeTabla,
   leerFecha,
   leerTecnica,
-  listasDePropiedades,
+  llenarTablaDePersonajes,
+  opcionesDePersonaje,
+  rellenoDePersonaje,
   mismaNota,
   opcionesDeEscena,
   ponerAbreviatura,
@@ -28,7 +30,8 @@ import { preferencias } from './ajustes';
 import { cmDe } from './editor/sugeridor';
 import { correr } from './correr';
 import { Calendario, Panel, PanelLista, PanelTecnica } from './paneles-ui';
-import { buscarGuion, buscarProyecto, leerConfigProyecto, propiedades } from './proyecto';
+import { buscarGuion, edadesDeFichas, leerConfigProyecto, listasDelProyecto, propiedades } from './proyecto';
+import { ordenReparto } from './generar';
 
 /** Lo que se escribe al vaciar una celda: el guion largo de las plantillas. */
 const VACIA = '—';
@@ -79,10 +82,7 @@ function lineaDeTabla(v: MarkdownView, tabla: HTMLTableElement): number | null {
 const textos = (fila: HTMLTableRowElement) => Array.from(fila.cells).map((c) => (c.querySelector('.table-cell-wrapper') ?? c).textContent ?? '');
 
 /** Movimientos, ángulos y lentes: los de las propiedades del proyecto (la ficha junto al guion), o los de fábrica. */
-function listasDe(app: App, nota: TFile): ListasTecnicas {
-  const proyecto = buscarProyecto(app, buscarGuion(app, nota.path) ?? nota);
-  return listasDePropiedades(proyecto ? propiedades(app, proyecto) : {});
-}
+const listasDe = (app: App, nota: TFile): ListasTecnicas => listasDelProyecto(app, nota);
 
 interface Destino {
   /** La nota y su texto al abrir el panel. */
@@ -218,6 +218,37 @@ async function alPulsar(app: App, e: MouseEvent): Promise<void> {
       new PanelTecnica(td, listas, inicial, (t) => {
         // Sin cambios no se reescribe nada: la celda se queda como la escribió la persona.
         if (escribirTecnica(t) !== escribirTecnica(inicial)) poner(() => escribirTecnica(t));
+      });
+      return;
+    }
+    case 'personaje': {
+      const guion = buscarGuion(app, nota.path);
+      if (!guion) {
+        new Notice('Este proyecto no tiene guion: una nota con «carpeta: guion» en esta carpeta.');
+        return;
+      }
+      const g = construir(await app.vault.cachedRead(guion), leerConfigProyecto(app, guion.path));
+      if (!td.isConnected || app.workspace.getActiveFile()?.path !== nota.path) return;
+      const personajes = opcionesDePersonaje(g, { edades: edadesDeFichas(app, guion), orden: ordenReparto(app, guion) });
+      if (!personajes.length) {
+        new Notice('El guion todavía no tiene personajes.');
+        return;
+      }
+      // En la tabla de reparto propuesto se puede llenar todo de una vez; en el apartado de un personaje, no.
+      const enTabla = !(celda.columnas === 2 && celda.columna === 1);
+      new PanelLista(td, {
+        titulo: 'Personaje',
+        opciones: personajes.map((o, k) => ({
+          valor: o.nombre,
+          clave: String(k),
+          detalle: [o.edad && `${o.edad} años`, o.escenas && `esc. ${o.escenas}`].filter(Boolean).join(' · '),
+        })),
+        actual: celda.texto,
+        alElegir: (op) => {
+          const o = personajes[Number(op.clave)];
+          if (o) correr(escribir(app, v, d, (t) => rellenoDePersonaje(t, linea, fila, columna, o)));
+        },
+        acciones: enTabla ? [{ texto: 'Llenar toda la tabla', etiqueta: 'Llenar toda la tabla con todo el reparto', fn: () => correr(escribir(app, v, d, (t) => llenarTablaDePersonajes(t, linea, personajes))) }] : undefined,
       });
       return;
     }

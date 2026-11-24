@@ -21,6 +21,7 @@ describe('config', () => {
       cronometraje: 'pagina',
       categorias: CATEGORIAS,
       personajesConocidos: [],
+      noSonPersonajes: [],
     });
   });
 

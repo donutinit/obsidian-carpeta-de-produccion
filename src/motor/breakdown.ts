@@ -1,11 +1,18 @@
 import { analizarEnLinea, textoPlano } from './enlinea';
 import type { Bloque, Documento } from './tipos';
 
+export interface ElementoBreakdown {
+  nombre: string;
+  cantidad: number;
+  /** `tecnico`: viene del movimiento de un plano del guion técnico; no está escrito en el guion. */
+  origen?: 'tecnico';
+}
+
 export interface BreakdownEscena {
   /** Quien habla (sin extensión) y los marcados como reparto, sin duplicados. */
   reparto: string[];
   /** Por código de categoría, los elementos con su cantidad máxima en la escena. */
-  elementos: Record<string, { nombre: string; cantidad: number }[]>;
+  elementos: Record<string, ElementoBreakdown[]>;
 }
 
 const capitalizar = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -26,9 +33,72 @@ const esVozEnOff = (ext?: string) => !!ext && /(^|[\s(])V\.?\s?O\.?($|[\s)])/i.t
 export const GENERICOS = new Set(['TODOS', 'TODAS', 'AMBOS', 'AMBAS', 'VOZ', 'VOCES', 'OTROS', 'OTRAS', 'GRUPO', 'VARIOS', 'VARIAS', 'ALGUIEN']);
 const REPARTO_EN_TEXTO = new Set(['encabezado', 'accion', 'plano', 'personaje', 'acotacion', 'dialogo', 'letra', 'transicion', 'centrado']);
 
+/** Artículos y preposiciones que pueden ir antes del nombre en mayúsculas: «EL NOTARIO (34)» es Notario. */
+const ARTICULOS = new Set(['EL', 'LA', 'LOS', 'LAS', 'UN', 'UNA', 'UNOS', 'UNAS', 'A', 'Y', 'E', 'O', 'DE', 'DEL', 'AL']);
+/** Títulos que llevan punto y siguen siendo parte del nombre: «DR. RAMÍREZ». */
+const TITULOS = new Set(['DR', 'DRA', 'SR', 'SRA', 'SRTA', 'LIC', 'ING', 'PROF', 'MTRO', 'MTRA']);
+const PALABRA = String.raw`\p{Lu}[\p{Lu}\p{N}'-]*`;
+/**
+ * «AURELIO (78)», «MARÍA (65 años)», «ROSA (30, cansada)», «TOÑO (40s)», «LA ESPOSA DE JOSÉ (30-35)», «MARÍA de la LUZ (40)».
+ * Un año («MONTERREY (2026)») no es una edad; lo de antes de un punto se separa después.
+ */
+const PRESENTACION = new RegExp(
+  String.raw`(?<![\p{L}\p{N}])(${PALABRA}(?:\.?[ ]+(?:(?:de|del|la|las|los)[ ]+)*${PALABRA})*)\s*\(\s*(\d{1,3})(s?)(?:\s*(?:-|–|a)\s*(\d{1,3}))?\s*(?:años|AÑOS|Años)?\s*(?:[,;][^)]*)?\)`,
+  'gu',
+);
+const CONECTORES = new Set(['de', 'del', 'la', 'las', 'los']);
+const llanoNombre = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase();
+
+/**
+ * Los personajes que la acción presenta en mayúsculas con su edad, como manda el formato: «AURELIO (78)». En orden de
+ * aparición, la primera edad de cada uno. Si quien habla usa un nombre más corto («AURELIO MÉNDEZ (78)» y luego
+ * AURELIO), es el mismo; «HIJO DE AURELIO» no.
+ */
+export function presentaciones(doc: Documento): { nombre: string; edad: string }[] {
+  const out: { nombre: string; edad: string }[] = [];
+  const hablan = [...new Set(doc.elementos.filter((e) => e.tipo === 'personaje' && e.nombre).map((e) => (e.nombre ?? '').trim().toUpperCase()))];
+  for (const e of doc.elementos) {
+    if (e.tipo !== 'accion') continue;
+    for (const m of textoPlano(analizarEnLinea(e.texto.replace(/\n/g, ' '))).matchAll(PRESENTACION)) {
+      if (Number(m[2]) > 120 || (m[4] && Number(m[4]) > 120)) continue;
+      // Lo de antes de un punto es otra oración («Se oye un PORTAZO. MARÍA (65)»), salvo un título («DR. RAMÍREZ»).
+      const oraciones = m[1].split(/\.\s+/);
+      let crudo = oraciones.pop() ?? '';
+      const previa = oraciones[oraciones.length - 1]?.trim().split(/\s+/).pop() ?? '';
+      if (TITULOS.has(previa)) crudo = `${previa}. ${crudo}`;
+      const palabras = crudo.trim().split(/\s+/);
+      while (palabras.length > 1 && ARTICULOS.has(palabras[0])) palabras.shift();
+      crudo = palabras.join(' ').replace(/[ '-]+$/, '');
+      if (!crudo || GENERICOS.has(crudo)) continue;
+      // El nombre con que habla, si es parte de este sin «de» de por medio: AURELIO MÉNDEZ → AURELIO.
+      if (!hablan.includes(crudo.toUpperCase())) {
+        const mias = crudo.split(/\s+/).map(llanoNombre);
+        const corto = hablan
+          .filter((h) => {
+            const suyas = h.split(/\s+/).map(llanoNombre);
+            const sobran = mias.filter((w) => !suyas.includes(w));
+            return suyas.every((w) => mias.includes(w)) && !sobran.some((w) => CONECTORES.has(w));
+          })
+          .sort((a, b) => b.length - a.length)[0];
+        if (corto) crudo = corto;
+      }
+      const nombre = nombrePropio(crudo);
+      const edad = m[4] ? `${m[2]}-${m[4]}` : m[2] + m[3];
+      if (!out.some((x) => mismo(x.nombre, nombre))) out.push({ nombre, edad });
+    }
+  }
+  return out;
+}
+
 export interface OpcionesBreakdown {
   /** Personajes conocidos aunque no hablen (notas de `Personajes/`). */
   conocidos?: string[];
+  /** Lo que el proyecto dice que no es personaje aunque se presente con edad (`no_son_personajes`). */
+  noPersonajes?: string[];
 }
 
 export function armarBreakdown(doc: Documento, bloques: Bloque[], opciones: OpcionesBreakdown = {}): BreakdownEscena[] {
@@ -53,7 +123,12 @@ export function armarBreakdown(doc: Documento, bloques: Bloque[], opciones: Opci
   // Reparto: quien habla (salvo solo en V.O.), los conocidos mencionados en la acción y los marcados,
   // en orden de primera aparición. `reparto=` en los metadatos de la escena reemplaza la lista.
   const hablan = doc.elementos.filter((e) => e.tipo === 'personaje' && e.nombre).map((e) => nombrePropio((e.nombre ?? '').trim()));
-  const conocidos = [...hablan, ...(opciones.conocidos ?? []).map((x) => x.trim()).filter(Boolean)].filter((n, k, a) => a.findIndex((x) => mismo(x, n)) === k);
+  // También quien se presenta con su edad aunque no hable («Un POLICÍA (35) vigila»).
+  const fuera = (opciones.noPersonajes ?? []).map(llanoNombre);
+  const presentados = presentaciones(doc)
+    .map((p) => p.nombre)
+    .filter((n) => !fuera.includes(llanoNombre(n)));
+  const conocidos = [...hablan, ...presentados, ...(opciones.conocidos ?? []).map((x) => x.trim()).filter(Boolean)].filter((n, k, a) => a.findIndex((x) => mismo(x, n)) === k);
   // En español muchos nombres son palabras comunes (Rosa, Luz, Sol, Todos): la mención cuenta solo escrita con
   // mayúscula (Rosa o ROSA), y nunca los nombres genéricos de diálogo.
   const patrones = conocidos
