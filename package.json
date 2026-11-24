@@ -1,0 +1,29 @@
+{
+  "name": "carpeta-de-produccion",
+  "version": "0.3.0",
+  "description": "Carpeta de producción: guion, octavos y breakdown para Obsidian",
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "dev": "node esbuild.config.mjs --watch",
+    "test": "vitest run",
+    "check": "tsc --noEmit",
+    "deploy": "tsc --noEmit && node esbuild.config.mjs && node scripts/instalar.mjs",
+    "lint": "eslint src manifest.json package.json"
+  },
+  "type": "commonjs",
+  "devDependencies": {
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.13",
+    "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
+    "eslint": "^9.39.5",
+    "eslint-plugin-obsidianmd": "^0.6.0",
+    "obsidian": "^1.14.4",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.74.0",
+    "vitest": "^5.1.1"
+  },
+  "author": "Diego Ayala",
+  "license": "MIT",
+  "private": true
+}
